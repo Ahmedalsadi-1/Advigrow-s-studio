@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -8,6 +9,26 @@ import { GoogleGenAI } from "@google/genai";
 import { randomUUID } from "crypto";
 
 const PORT = 8012;
+
+// --- MOCK AUTHENTICATION DATA ---
+let loggedInUser = null; // In-memory session store
+
+const MOCK_USERS = {
+  google: {
+    username: 'Advigrow G.',
+    email: 'advigrow.google@example.com',
+    avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=g-advigrow&backgroundColor=transparent,b6e3f4`,
+    provider: 'google',
+  },
+  github: {
+    username: 'advigrow-dev',
+    email: 'advigrow.github@example.com',
+    avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=gh-advigrow`,
+    provider: 'github',
+  }
+};
+// --- END MOCK DATA ---
+
 
 // Popular models fallback list (matching frontend)
 const POPULAR_CHECKPOINTS = [
@@ -106,6 +127,49 @@ async function main() {
 
     const url = new URL(req.url, `http://localhost:${PORT}`);
 
+    // --- MOCK AUTH API ENDPOINTS ---
+    if (url.pathname.startsWith('/api/')) {
+        // Login with a specific provider
+        if (req.method === 'GET' && url.pathname.startsWith('/api/login/')) {
+            const provider = url.pathname.split('/')[3];
+            if (provider === 'google' || provider === 'github') {
+                loggedInUser = MOCK_USERS[provider];
+                console.log(`\n[Notification] User '${loggedInUser.username}' just signed in via ${provider}!\n`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(loggedInUser));
+            } else {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid provider' }));
+            }
+            return;
+        }
+
+        // Check current user status
+        if (req.method === 'GET' && url.pathname === '/api/user') {
+            if (loggedInUser) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(loggedInUser));
+            } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Not logged in' }));
+            }
+            return;
+        }
+
+        // Logout
+        if (req.method === 'GET' && url.pathname === '/api/logout') {
+            if (loggedInUser) {
+                console.log(`\n[Notification] User '${loggedInUser.username}' logged out.\n`);
+            }
+            loggedInUser = null;
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok' }));
+            return;
+        }
+    }
+    // --- END MOCK AUTH API ---
+
+
     // 1. SSE Endpoint for connecting
     if (req.method === 'GET' && url.pathname === '/sse') {
       const sessionId = randomUUID();
@@ -164,9 +228,10 @@ async function main() {
   });
 
   server.listen(PORT, () => {
-    console.log(`\n=== Veo Cameo MCP Server ===`);
+    console.log(`\n=== Advigrow Studio Server ===`);
     console.log(`Running on http://localhost:${PORT}`);
-    console.log(`SSE Endpoint: http://localhost:${PORT}/sse`);
+    console.log(`- MCP Endpoint: /sse`);
+    console.log(`- Mock Auth API: /api/*`);
     console.log(`Ready to connect with AI tools.\n`);
   });
 }

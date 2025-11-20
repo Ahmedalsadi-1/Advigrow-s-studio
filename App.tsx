@@ -10,9 +10,10 @@ import ApiKeyDialog from './components/ApiKeyDialog';
 import BottomPromptBar from './components/BottomPromptBar';
 import VideoCard from './components/VideoCard';
 import SettingsDialog from './components/SettingsDialog';
+import LoginDialog from './components/LoginDialog';
 import { generateVideo } from './services/geminiService';
-import { FeedPost, GenerateVideoParams, PostStatus, EngineType } from './types';
-import { Clapperboard } from 'lucide-react';
+import { FeedPost, GenerateVideoParams, PostStatus, EngineType, UserProfile } from './types';
+import { Clapperboard, LogIn, LogOut } from 'lucide-react';
 
 // Sample video URLs for the feed (public domain/creative commons)
 const sampleVideos: FeedPost[] = [
@@ -52,10 +53,29 @@ const App: React.FC = () => {
   const [feed, setFeed] = useState<FeedPost[]>(sampleVideos);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [comfyUrl, setComfyUrl] = useState('http://127.0.0.1:8188');
   const [comfyModel, setComfyModel] = useState('');
   const [comfyGpuEnabled, setComfyGpuEnabled] = useState(true);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [isProfileMenuOpen, setProfileMenuOpen] = useState(false);
+
+  // Check login status on initial render
+  useEffect(() => {
+    const checkUserStatus = async () => {
+      try {
+        const response = await fetch('http://localhost:8012/api/user');
+        if (response.ok) {
+          const user = await response.json();
+          setCurrentUser(user);
+        }
+      } catch (error) {
+        console.warn("Could not check user status:", error);
+      }
+    };
+    checkUserStatus();
+  }, []);
 
   // Auto-dismiss error toast
   useEffect(() => {
@@ -117,6 +137,11 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = useCallback(async (params: GenerateVideoParams) => {
+    if (!currentUser) {
+      setShowLoginDialog(true);
+      return;
+    }
+    
     // Only check Google API key if using Veo or if using Veo as helper for templates
     if (params.engine === EngineType.VEO || params.templateId) {
         if (window.aistudio) {
@@ -148,8 +173,8 @@ const App: React.FC = () => {
     // Create new post object with GENERATING status
     const newPost: FeedPost = {
       id: newPostId,
-      username: 'you',
-      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=you',
+      username: currentUser.username,
+      avatarUrl: currentUser.avatarUrl,
       description: params.prompt,
       modelTag: modelTag,
       engineType: params.engine,
@@ -164,7 +189,7 @@ const App: React.FC = () => {
     // Start generation in background
     processGeneration(newPostId, params);
 
-  }, [comfyUrl, comfyModel, comfyGpuEnabled]);
+  }, [comfyUrl, comfyModel, comfyGpuEnabled, currentUser]);
 
   const handleApiKeyDialogContinue = async () => {
     setShowApiKeyDialog(false);
@@ -172,6 +197,32 @@ const App: React.FC = () => {
       await window.aistudio.openSelectKey();
     }
   };
+
+  const handleLogin = async (provider: 'google' | 'github') => {
+    try {
+      const response = await fetch(`http://localhost:8012/api/login/${provider}`);
+      if (response.ok) {
+        const user = await response.json();
+        setCurrentUser(user);
+        setShowLoginDialog(false);
+      } else {
+        setErrorToast("Mock login failed. See server console.");
+      }
+    } catch (error) {
+       setErrorToast("Could not connect to login service.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('http://localhost:8012/api/logout');
+      setCurrentUser(null);
+      setProfileMenuOpen(false);
+    } catch (error) {
+      setErrorToast("Logout failed. Could not connect to service.");
+    }
+  };
+
 
   return (
     <div className="h-screen w-screen bg-black text-white flex flex-col overflow-hidden font-sans selection:bg-white/20 selection:text-white">
@@ -188,6 +239,12 @@ const App: React.FC = () => {
         onSaveComfyModel={setComfyModel}
         enableGpu={comfyGpuEnabled}
         onSaveEnableGpu={setComfyGpuEnabled}
+      />
+
+      <LoginDialog 
+        isOpen={showLoginDialog}
+        onClose={() => setShowLoginDialog(false)}
+        onLogin={handleLogin}
       />
       
       {/* Error Toast */}
@@ -217,19 +274,53 @@ const App: React.FC = () => {
                     <Clapperboard className="w-8 h-8 text-white" />
                     <h1 className="font-bogle text-3xl text-white tracking-wide drop-shadow-sm">Advigrow's Studio</h1>
                 </div>
+                 
+                 <div className="flex items-center gap-6">
+                    {currentUser ? (
+                      <div className="relative">
+                        <button onClick={() => setProfileMenuOpen(!isProfileMenuOpen)} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 p-2 pr-4 rounded-full transition-colors">
+                          <img src={currentUser.avatarUrl} alt="User avatar" className="w-8 h-8 rounded-full border-2 border-white/20" />
+                          <span className="font-bold text-sm text-white">{currentUser.username}</span>
+                        </button>
+                        <AnimatePresence>
+                          {isProfileMenuOpen && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="absolute top-full right-0 mt-2 w-48 bg-neutral-900/90 border border-white/10 rounded-xl shadow-2xl backdrop-blur-xl overflow-hidden ring-1 ring-black/20"
+                              onClick={() => setProfileMenuOpen(false)}
+                            >
+                              <div className="p-2">
+                                <button onClick={handleLogout} className="w-full flex items-center gap-3 text-left px-3 py-2 text-sm text-red-300 hover:bg-white/5 rounded-md transition-colors">
+                                  <LogOut className="w-4 h-4" />
+                                  <span>Logout</span>
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    ) : (
+                      <button onClick={() => setShowLoginDialog(true)} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold py-2 px-4 rounded-full transition-colors text-sm">
+                        <LogIn className="w-4 h-4" />
+                        Login
+                      </button>
+                    )}
 
-                <div className="flex items-center gap-3 font-bogle text-xs font-medium text-white/60 tracking-wide flex-wrap justify-end">
-                    <span>TikTok:</span>
-                    <a href="https://www.tiktok.com/@advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@advigrow</a>
-                    <span>/</span>
-                    <a href="https://www.tiktok.com/@roxaszm" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@roxaszm</a>
-                    <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
-                    <a href="https://www.instagram.com/advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>
-                    <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
-                    <a href="https://twitter.com/advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Twitter</a>
-                    <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
-                    <a href="https://www.youtube.com/@Trendbiz" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">YouTube</a>
-                </div>
+                    <div className="hidden lg:flex items-center gap-3 font-bogle text-xs font-medium text-white/60 tracking-wide flex-wrap justify-end">
+                        <span>TikTok:</span>
+                        <a href="https://www.tiktok.com/@advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@advigrow</a>
+                        <span>/</span>
+                        <a href="https://www.tiktok.com/@roxaszm" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@roxaszm</a>
+                        <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
+                        <a href="https://www.instagram.com/advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>
+                        <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
+                        <a href="https://twitter.com/advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Twitter</a>
+                        <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
+                        <a href="https://www.youtube.com/@Trendbiz" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">YouTube</a>
+                    </div>
+                 </div>
             </div>
         </header>
 

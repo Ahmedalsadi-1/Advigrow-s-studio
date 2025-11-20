@@ -100,3 +100,10 @@ export interface CameoProfile {
   name: string;
   imageUrl: string; 
 }
+
+export interface UserProfile {
+  username: string;
+  avatarUrl: string;
+  email?: string;
+  provider?: 'google' | 'github';
+}
