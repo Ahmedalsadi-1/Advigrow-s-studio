@@ -1,0 +1,257 @@
+
+
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+*/
+import { AnimatePresence, motion } from 'framer-motion';
+import React, { useCallback, useEffect, useState } from 'react';
+import ApiKeyDialog from './components/ApiKeyDialog';
+import BottomPromptBar from './components/BottomPromptBar';
+import VideoCard from './components/VideoCard';
+import SettingsDialog from './components/SettingsDialog';
+import { generateVideo } from './services/geminiService';
+import { FeedPost, GenerateVideoParams, PostStatus, EngineType } from './types';
+import { Clapperboard } from 'lucide-react';
+
+// Sample video URLs for the feed (public domain/creative commons)
+const sampleVideos: FeedPost[] = [
+  {
+    id: 's1',
+    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-alisa.mp4',
+    username: 'alisa_fortin',
+    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Maria',
+    description: 'Sipping coffee at a parisian cafe',
+    modelTag: 'Veo Fast',
+    engineType: EngineType.VEO,
+    status: PostStatus.SUCCESS,
+  },
+  {
+    id: 's2',
+    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-omar.mp4',
+    username: 'osanseviero',
+    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Emery',
+    description: 'At a llama petting zoo',
+    modelTag: 'Veo Fast',
+    engineType: EngineType.VEO,
+    status: PostStatus.SUCCESS,
+  },
+    {
+    id: 's3',
+    videoUrl: 'https://storage.googleapis.com/sideprojects-asronline/veo-cameos/cameo-ammaar.mp4',
+    username: 'ammaar',
+    avatarUrl: 'https://api.dicebear.com/9.x/fun-emoji/svg?seed=Kimberly',
+    description: 'At a red carpet ceremony',
+    modelTag: 'Veo',
+    engineType: EngineType.VEO,
+    status: PostStatus.SUCCESS,
+  },
+];
+
+const App: React.FC = () => {
+  const [feed, setFeed] = useState<FeedPost[]>(sampleVideos);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [comfyUrl, setComfyUrl] = useState('http://127.0.0.1:8188');
+  const [comfyModel, setComfyModel] = useState('');
+  const [comfyGpuEnabled, setComfyGpuEnabled] = useState(true);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+
+  // Auto-dismiss error toast
+  useEffect(() => {
+    if (errorToast) {
+      const timer = setTimeout(() => setErrorToast(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorToast]);
+
+  const updateFeedPost = (id: string, updates: Partial<FeedPost>) => {
+    setFeed(prevFeed => 
+      prevFeed.map(post => 
+        post.id === id ? { ...post, ...updates } : post
+      )
+    );
+  };
+
+  const processGeneration = async (postId: string, params: GenerateVideoParams) => {
+    try {
+      // Inject configured Comfy URL and Model if engine is ComfyUI
+      const paramsWithConfig = {
+        ...params,
+        comfyUrl: params.engine === EngineType.COMFY_UI ? comfyUrl : undefined,
+        comfyModel: params.engine === EngineType.COMFY_UI ? comfyModel : undefined,
+        comfyGpuEnabled: params.engine === EngineType.COMFY_UI ? comfyGpuEnabled : undefined
+      };
+
+      const { url, enhancedPrompt } = await generateVideo(paramsWithConfig);
+      updateFeedPost(postId, { 
+          videoUrl: url, 
+          status: PostStatus.SUCCESS,
+          description: enhancedPrompt || params.prompt // Update description if prompt was enhanced
+      });
+    } catch (error) {
+      console.error('Video generation failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error.';
+      updateFeedPost(postId, { status: PostStatus.ERROR, errorMessage: errorMessage });
+      
+      // Handle specific errors for toast notifications
+      if (typeof errorMessage === 'string') {
+         if (
+          errorMessage.includes('API_KEY_INVALID') || 
+          errorMessage.includes('permission denied') ||
+          errorMessage.includes('Requested entity was not found')
+        ) {
+          setErrorToast('Invalid API key or permissions. Please check billing.');
+        } else if (
+          errorMessage.includes('Connection refused') ||
+          errorMessage.includes('Failed to fetch')
+        ) {
+          setErrorToast('ComfyUI Connection Failed. Check Settings.');
+        } else if (errorMessage.includes('ComfyUI URL is required')) {
+          setErrorToast('ComfyUI URL missing. Open Settings.');
+        } else if (errorMessage.includes('Bad Request') || errorMessage.includes('queue prompt')) {
+          setErrorToast('Workflow Error. Check ComfyUI Console or Model Selection.');
+        }
+      }
+    }
+  };
+
+  const handleGenerate = useCallback(async (params: GenerateVideoParams) => {
+    // Only check Google API key if using Veo or if using Veo as helper for templates
+    if (params.engine === EngineType.VEO || params.templateId) {
+        if (window.aistudio) {
+        try {
+            if (!(await window.aistudio.hasSelectedApiKey())) {
+            setShowApiKeyDialog(true);
+            return;
+            }
+        } catch (error) {
+            setShowApiKeyDialog(true);
+            return;
+        }
+        }
+    }
+    
+    // Check Comfy Config before starting
+    if (params.engine === EngineType.COMFY_UI && !comfyUrl) {
+        setShowSettingsDialog(true);
+        return;
+    }
+
+    const newPostId = Date.now().toString();
+    const refImage = params.referenceImages?.[0]?.base64;
+
+    const modelTag = params.engine === EngineType.COMFY_UI 
+        ? (comfyModel ? `ComfyUI (${comfyModel.substring(0, 10)}...)` : 'ComfyUI')
+        : (params.model === 'veo-3.1-fast-generate-preview' ? 'Veo Fast' : 'Veo');
+
+    // Create new post object with GENERATING status
+    const newPost: FeedPost = {
+      id: newPostId,
+      username: 'you',
+      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=you',
+      description: params.prompt,
+      modelTag: modelTag,
+      engineType: params.engine,
+      templateLabel: params.templateId,
+      status: PostStatus.GENERATING,
+      referenceImageBase64: refImage,
+    };
+
+    // Prepend to feed immediately
+    setFeed(prev => [newPost, ...prev]);
+
+    // Start generation in background
+    processGeneration(newPostId, params);
+
+  }, [comfyUrl, comfyModel, comfyGpuEnabled]);
+
+  const handleApiKeyDialogContinue = async () => {
+    setShowApiKeyDialog(false);
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+    }
+  };
+
+  return (
+    <div className="h-screen w-screen bg-black text-white flex flex-col overflow-hidden font-sans selection:bg-white/20 selection:text-white">
+      {showApiKeyDialog && (
+        <ApiKeyDialog onContinue={handleApiKeyDialogContinue} />
+      )}
+
+      <SettingsDialog 
+        isOpen={showSettingsDialog} 
+        onClose={() => setShowSettingsDialog(false)}
+        comfyUrl={comfyUrl}
+        onSaveComfyUrl={setComfyUrl}
+        comfyModel={comfyModel}
+        onSaveComfyModel={setComfyModel}
+        enableGpu={comfyGpuEnabled}
+        onSaveEnableGpu={setComfyGpuEnabled}
+      />
+      
+      {/* Error Toast */}
+      <AnimatePresence>
+        {errorToast && (
+            <motion.div 
+                initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 24, scale: 1 }}
+                exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                className="fixed top-0 left-1/2 -translate-x-1/2 z-[60] bg-neutral-900/95 border border-red-500/30 text-white px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-xl max-w-md text-center text-sm font-medium flex items-center gap-3 ring-1 ring-red-500/20"
+            >
+                <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse"></div>
+                {errorToast}
+            </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <main className="flex-1 h-full relative overflow-y-auto overflow-x-hidden no-scrollbar bg-black">
+        <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,_rgba(255,255,255,0.03),_transparent_70%)]"></div>
+
+        {/* Top Bar */}
+        <header className="sticky top-0 z-30 w-full px-6 py-6 pointer-events-none">
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-xl mask-image-linear-gradient-to-b" />
+            
+            <div className="relative flex items-center justify-between text-white pointer-events-auto max-w-[1600px] mx-auto w-full">
+                <div className="flex items-center gap-3.5">
+                    <Clapperboard className="w-8 h-8 text-white" />
+                    <h1 className="font-bogle text-3xl text-white tracking-wide drop-shadow-sm">Advigrow's Studio</h1>
+                </div>
+
+                <div className="flex items-center gap-3 font-bogle text-xs font-medium text-white/60 tracking-wide flex-wrap justify-end">
+                    <span>TikTok:</span>
+                    <a href="https://www.tiktok.com/@advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@advigrow</a>
+                    <span>/</span>
+                    <a href="https://www.tiktok.com/@roxaszm" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@roxaszm</a>
+                    <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
+                    <a href="https://www.instagram.com/advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>
+                    <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
+                    <a href="https://twitter.com/advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Twitter</a>
+                    <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
+                    <a href="https://www.youtube.com/@Trendbiz" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">YouTube</a>
+                </div>
+            </div>
+        </header>
+
+        {/* Video Grid */}
+        <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 pb-64 relative z-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            <AnimatePresence initial={false}>
+              {feed.map((post) => (
+                <VideoCard key={post.id} post={post} />
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+      </main>
+
+      <BottomPromptBar 
+        onGenerate={handleGenerate} 
+        onOpenSettings={() => setShowSettingsDialog(true)}
+        comfyEnabled={!!comfyUrl}
+      />
+    </div>
+  );
+};
+
+export default App;
