@@ -10,7 +10,7 @@ import { User, X } from 'lucide-react';
 interface LoginDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (provider: 'google' | 'github') => void;
+  onLogin: (provider: 'google' | 'github' | 'discord' | 'twitter') => void;
 }
 
 const GoogleIcon: React.FC = () => (
@@ -29,53 +29,55 @@ const GitHubIcon: React.FC = () => (
     </svg>
 );
 
+const DiscordIcon: React.FC = () => (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M20.317 4.36981C18.7915 3.74625 17.1826 3.2841 15.5243 3.01691C15.2955 3.42784 15.0428 3.88674 14.8383 4.36981C13.2265 4.0533 11.6117 4.0533 10.0028 4.36981C9.79839 3.88674 9.54565 3.42784 9.31686 3.01691C7.65859 3.2841 6.04968 3.74625 4.52422 4.36981C3.23844 7.2185 2.82245 9.98634 3.15589 12.6843C4.24652 13.5649 5.43715 14.238 6.53073 14.7739C6.37284 15.0026 6.21789 15.2283 6.06587 15.4511C5.23215 15.1971 4.45155 14.8395 3.72385 14.382C3.58596 14.5366 3.45099 14.6883 3.31896 14.837C2.43323 15.637 1.76019 16.5905 1.25841 17.6521C2.98188 18.986 4.96284 19.9532 7.10777 20.522C7.54225 19.8974 7.92817 19.2329 8.26161 18.5316C7.42789 18.2776 6.64729 17.92 5.91959 17.4625C6.07161 17.2397 6.22363 17.017 6.37284 16.7913C7.66155 17.4361 9.10237 17.8933 10.6309 18.118C11.0264 18.6625 11.4947 19.1414 12.0115 19.5393C12.5284 19.1414 12.9967 18.6625 13.3921 18.118C14.8722 17.8933 16.2917 17.4361 17.5804 16.7913C17.7296 17.017 17.8816 17.2397 18.0336 17.4625C17.3059 17.92 16.5253 18.2776 15.6916 18.5316C16.0251 19.2329 16.411 19.8974 16.8455 20.522C18.9875 19.9532 20.9714 18.986 22.6949 17.6521C22.1931 16.5905 21.5171 15.637 20.6314 14.837C20.5023 14.6883 20.3644 14.5366 20.2265 14.382C19.4988 14.8395 18.7182 15.1971 17.8845 15.4511C17.7325 15.2283 17.5775 15.0026 17.4196 14.7739C18.5103 14.238 19.7009 13.5649 20.7915 12.6843C21.1775 9.98634 20.7615 7.2185 19.4757 4.36981H20.317Z M7.99933 11.0234C8.66311 11.0234 9.20448 10.4856 9.20448 9.82658C9.20448 9.16757 8.66311 8.62973 7.99933 8.62973C7.33555 8.62973 6.79419 9.16757 6.79419 9.82658C6.79419 10.4856 7.33555 11.0234 7.99933 11.0234Z M15.9998 11.0234C16.6636 11.0234 17.205 10.4856 17.205 9.82658C17.205 9.16757 16.6636 8.62973 15.9998 8.62973C15.336 8.62973 14.7947 9.16757 14.7947 9.82658C14.7947 10.4856 15.336 11.0234 15.9998 11.0234Z"/>
+    </svg>
+);
+
+const XIcon: React.FC = () => (
+    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M9.293 6.953L14.632 1h-1.32L9.039 6.183L5.618 1H1.455l5.638 7.974L1.368 15h1.32l4.577-5.18L11.382 15h4.162L9.292 6.953h.001Z M7.143 8.324L6.61 7.625L2.345 2.05h1.954l3.85 4.54l.533.7l4.49 5.98h-1.954L7.143 8.324Z"/>
+    </svg>
+);
 
 const LoginDialog: React.FC<LoginDialogProps> = ({ isOpen, onClose, onLogin }) => {
-  
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[60] p-4">
-      <div className="bg-neutral-900 border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl ring-1 ring-white/5 flex flex-col">
-        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-          <div className="flex items-center gap-3">
-             <div className="bg-blue-500/20 p-2 rounded-lg">
-                <User className="w-5 h-5 text-blue-300" />
-            </div>
-            <h2 className="text-xl font-bogle text-white">Welcome Back</h2>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-opacity duration-300">
+      <div className="bg-neutral-900/60 border border-white/10 backdrop-blur-2xl rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-sm w-full p-8 text-center flex flex-col items-center ring-1 ring-white/5 relative overflow-hidden">
+        
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-gray-500 hover:text-white transition-colors rounded-full">
+            <X className="w-5 h-5"/>
+        </button>
 
-        <div className="p-8 space-y-6">
-          <p className="text-sm text-center text-gray-300">
-            Sign in to continue to Advigrow's Studio.
-          </p>
-          
-          <div className="flex flex-col gap-4">
-            <button
-              onClick={() => onLogin('google')}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-200 text-black font-semibold rounded-xl text-sm transition-all shadow-md hover:shadow-lg"
-            >
-              <GoogleIcon />
-              Sign in with Google
-            </button>
-            <button
-              onClick={() => onLogin('github')}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#24292e] hover:bg-[#333] text-white font-semibold rounded-xl text-sm transition-all shadow-md hover:shadow-lg"
-            >
-              <GitHubIcon />
-              Sign in with GitHub
-            </button>
-          </div>
+        <div className="bg-white/5 p-5 rounded-full mb-6 ring-1 ring-white/10 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)] relative z-10">
+          <User className="w-8 h-8 text-white opacity-90" />
         </div>
-
-        <div className="p-4 bg-black/20 border-t border-white/5 text-center">
-            <p className="text-xs text-gray-500">
-                By signing in, you agree to our Terms of Service.
-            </p>
+        
+        <h2 className="text-2xl font-bold text-white mb-3 font-bogle tracking-wide drop-shadow-md">Join the Studio</h2>
+        <p className="text-gray-300 mb-8 text-sm leading-relaxed font-light">
+          Sign in to create, share, and save your video masterpieces.
+        </p>
+        
+        <div className="w-full space-y-3">
+            <button onClick={() => onLogin('google')} className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold rounded-xl transition-colors text-sm">
+                <GoogleIcon />
+                Sign in with Google
+            </button>
+            <button onClick={() => onLogin('github')} className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#24292e] hover:bg-[#343a40] text-white font-bold rounded-xl transition-colors text-sm">
+                <GitHubIcon />
+                Sign in with GitHub
+            </button>
+            <button onClick={() => onLogin('discord')} className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#5865F2] hover:bg-[#4a56d4] text-white font-bold rounded-xl transition-colors text-sm">
+                <DiscordIcon />
+                Sign in with Discord
+            </button>
+            <button onClick={() => onLogin('twitter')} className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#000000] hover:bg-[#1f1f1f] border border-white/20 text-white font-bold rounded-xl transition-colors text-sm">
+                <XIcon />
+                Sign in with X
+            </button>
         </div>
       </div>
     </div>

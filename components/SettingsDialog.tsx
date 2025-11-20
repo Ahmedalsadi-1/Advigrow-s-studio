@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -163,6 +164,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   };
 
   const handleSave = () => {
+    localStorage.setItem('comfyUrl', url);
     onSaveComfyUrl(url);
     onSaveComfyModel(selectedModel);
     onSaveEnableGpu(gpuEnabled);
@@ -229,9 +231,9 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </div>
             
             <p className="text-xs text-gray-400 leading-relaxed">
-                Enter your local ComfyUI URL (e.g., http://127.0.0.1:8188).
+                Enter your ComfyUI URL (e.g., http://127.0.0.1:8188).
                 <br/>
-                <span className="text-white/30 mt-1 block">If offline, the app will try to find it or switch to simulation.</span>
+                <span className="text-white/30 mt-1 block">If using a tunnel (like ngrok), use the secure `https` URL to avoid browser connection issues.</span>
             </p>
             
             <div className="flex gap-2">

@@ -13,7 +13,7 @@ import SettingsDialog from './components/SettingsDialog';
 import LoginDialog from './components/LoginDialog';
 import { generateVideo } from './services/geminiService';
 import { FeedPost, GenerateVideoParams, PostStatus, EngineType, UserProfile } from './types';
-import { Clapperboard, LogIn, LogOut } from 'lucide-react';
+import { Clapperboard, Heart, LogIn, LogOut } from 'lucide-react';
 
 // Sample video URLs for the feed (public domain/creative commons)
 const sampleVideos: FeedPost[] = [
@@ -55,17 +55,17 @@ const App: React.FC = () => {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [comfyUrl, setComfyUrl] = useState('http://127.0.0.1:8188');
+  const [comfyUrl, setComfyUrl] = useState('');
   const [comfyModel, setComfyModel] = useState('');
   const [comfyGpuEnabled, setComfyGpuEnabled] = useState(true);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [isProfileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  // Check login status on initial render
+  // Check login status & load comfy URL on initial render
   useEffect(() => {
     const checkUserStatus = async () => {
       try {
-        const response = await fetch('http://localhost:8012/api/user');
+        const response = await fetch('/api/user');
         if (response.ok) {
           const user = await response.json();
           setCurrentUser(user);
@@ -75,6 +75,11 @@ const App: React.FC = () => {
       }
     };
     checkUserStatus();
+
+    const savedComfyUrl = localStorage.getItem('comfyUrl');
+    if (savedComfyUrl) {
+      setComfyUrl(savedComfyUrl);
+    }
   }, []);
 
   // Auto-dismiss error toast
@@ -198,9 +203,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogin = async (provider: 'google' | 'github') => {
+  const handleLogin = async (provider: 'google' | 'github' | 'discord' | 'twitter') => {
     try {
-      const response = await fetch(`http://localhost:8012/api/login/${provider}`);
+      const response = await fetch(`/api/login/${provider}`);
       if (response.ok) {
         const user = await response.json();
         setCurrentUser(user);
@@ -215,7 +220,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:8012/api/logout');
+      await fetch('/api/logout');
       setCurrentUser(null);
       setProfileMenuOpen(false);
     } catch (error) {
@@ -309,6 +314,11 @@ const App: React.FC = () => {
                     )}
 
                     <div className="hidden lg:flex items-center gap-3 font-bogle text-xs font-medium text-white/60 tracking-wide flex-wrap justify-end">
+                        <a href="https://advigrow.online" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white px-2.5 py-1 rounded-full transition-colors">
+                            <Heart className="w-3 h-3 text-red-400" />
+                            <span>Powered by Advigrow</span>
+                        </a>
+                        <div className="h-3 w-px bg-white/20 mx-1 hidden sm:block"></div>
                         <span>TikTok:</span>
                         <a href="https://www.tiktok.com/@advigrow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">@advigrow</a>
                         <span>/</span>
