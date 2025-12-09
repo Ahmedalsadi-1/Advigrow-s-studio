@@ -12,6 +12,7 @@ import VideoCard from './components/VideoCard';
 import SettingsDialog from './components/SettingsDialog';
 import LoginDialog from './components/LoginDialog';
 import { generateVideo } from './services/geminiService';
+import { discoverComfyUrl, getComfyModels } from './services/comfyService';
 import { FeedPost, GenerateVideoParams, PostStatus, EngineType, UserProfile } from './types';
 import { Clapperboard, Heart, LogIn, LogOut } from 'lucide-react';
 
@@ -81,6 +82,43 @@ const App: React.FC = () => {
       setComfyUrl(savedComfyUrl);
     }
   }, []);
+
+  useEffect(() => {
+    const initializeComfy = async () => {
+      const savedComfyUrl = localStorage.getItem('comfyUrl') || comfyUrl;
+      let activeUrl = savedComfyUrl;
+
+      if (!activeUrl) {
+        try {
+          const discoveredUrl = await discoverComfyUrl();
+          if (discoveredUrl) {
+            activeUrl = discoveredUrl;
+            localStorage.setItem('comfyUrl', discoveredUrl);
+            setComfyUrl(discoveredUrl);
+          }
+        } catch (error) {
+          console.warn('ComfyUI discovery failed:', error);
+        }
+      }
+
+      if (!activeUrl) return;
+
+      try {
+        const models = await getComfyModels(activeUrl);
+        if (!comfyUrl) {
+          setComfyUrl(activeUrl);
+        }
+        if (models.length > 0) {
+          setComfyModel(prev => prev || models[0]);
+        }
+      } catch (error) {
+        console.warn('Automatic ComfyUI connection failed:', error);
+        setErrorToast('ComfyUI Connection Failed. Check Settings.');
+      }
+    };
+
+    initializeComfy();
+  }, [comfyUrl]);
 
   // Auto-dismiss error toast
   useEffect(() => {
